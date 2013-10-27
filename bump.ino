@@ -3,20 +3,26 @@
 
 #include <MsTimer2.h>
 
+const int BEATS = 16;
+
 const int LED_PIN = 13;
 const int BUF_LEN = 64;
 
 char beat1[BUF_LEN];
 char beat2[BUF_LEN];
+char beat3[BUF_LEN];
 
 void setup() {
     pinMode(LED_PIN, OUTPUT);
     MIDI.begin(0);
   
-    fill_beats((char *)&beat1, 4, 16);
-    fill_beats((char *)&beat2, 6, 16);
+    randomSeed(analogRead(0));
+    
+    fill_beats((char *)&beat1, (int)random(BEATS), BEATS);
+    fill_beats((char *)&beat2, (int)random(BEATS), BEATS);
+    fill_beats((char *)&beat3, (int)random(BEATS), BEATS);
 
-    set_bpm(460);
+    set_bpm(100*4);
 }
 
 void set_bpm(float bpm) {
@@ -45,9 +51,9 @@ void fill_beats(char *beat, int num_beats, int num_steps) {
     }
 }
 
-volatile unsigned int ticks = 0;
+volatile unsigned char do_tick = 0;
 void tick() {
-    ticks++;
+    do_tick = 1;
 }
 
 void start_playing(int note) {
@@ -55,15 +61,30 @@ void start_playing(int note) {
     MIDI.sendNoteOn(note, 127, 1);
 }
 
+unsigned char pos = 0;
 void on_tick() {
-    if (beat1[ticks%16] == 'x') start_playing(36);
-    if (beat2[ticks%16] == 'x') start_playing(38);
+    MIDI.sendNoteOn(36, 0, 1);
+    MIDI.sendNoteOn(38, 0, 1);
+    MIDI.sendNoteOn(51, 0, 1);
+    
+    if (beat1[pos] == 'x') {
+        MIDI.sendNoteOn(36, 127, 1);
+    }
+    if (beat2[pos] == 'x') {
+        MIDI.sendNoteOn(38, 127, 1);
+    }
+    if (beat3[pos] == 'x') {
+        MIDI.sendNoteOn(51, 127, 1);
+    }
+
+    if (++pos == BEATS) {
+        pos = 0;
+    }
 }
 
-unsigned int prev_ticks = -1;
 void loop() {
-    if (prev_ticks != ticks) {
+    if (do_tick) {
+        do_tick = 0;
         on_tick();
     }
-    prev_ticks = ticks;
 }
