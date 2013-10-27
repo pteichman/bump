@@ -21,20 +21,8 @@ void setup() {
     fill_beats((char *)&beat1, (int)random(BEATS), BEATS);
     fill_beats((char *)&beat2, (int)random(BEATS), BEATS);
     fill_beats((char *)&beat3, (int)random(BEATS), BEATS);
-
-    set_bpm(100*4);
-}
-
-void set_bpm(float bpm) {
-    if (bpm <= 0) {
-        bpm = 1;
-    }
-  
-    int ms = (int)(60000. / bpm);
-  
-    MsTimer2::stop();
-    MsTimer2::set(ms, &tick);
-    MsTimer2::start();
+    
+    MIDI.setHandleClock(&on_clock);
 }
 
 void fill_beats(char *beat, int num_beats, int num_steps) {
@@ -51,30 +39,29 @@ void fill_beats(char *beat, int num_beats, int num_steps) {
     }
 }
 
-volatile unsigned char do_tick = 0;
-void tick() {
-    do_tick = 1;
-}
-
-void start_playing(int note) {
-    MIDI.sendNoteOn(note, 0, 1);
-    MIDI.sendNoteOn(note, 127, 1);
+/* 24 pulses per quarter note: so for 8th notes wait 12 pulses */
+volatile unsigned char clock = 0;
+void on_clock() {
+    if (++clock > 12) {
+        on_beat();
+        clock = 0;
+    }
 }
 
 unsigned char pos = 0;
-void on_tick() {
+void on_beat() {
     MIDI.sendNoteOn(36, 0, 1);
     MIDI.sendNoteOn(38, 0, 1);
     MIDI.sendNoteOn(51, 0, 1);
     
     if (beat1[pos] == 'x') {
-        MIDI.sendNoteOn(36, 127, 1);
+        MIDI.sendNoteOn(36, 100, 1);
     }
     if (beat2[pos] == 'x') {
-        MIDI.sendNoteOn(38, 127, 1);
+        MIDI.sendNoteOn(38, 100, 1);
     }
     if (beat3[pos] == 'x') {
-        MIDI.sendNoteOn(51, 127, 1);
+        MIDI.sendNoteOn(51, 100, 1);
     }
 
     if (++pos == BEATS) {
@@ -83,8 +70,5 @@ void on_tick() {
 }
 
 void loop() {
-    if (do_tick) {
-        do_tick = 0;
-        on_tick();
-    }
+    MIDI.read();
 }
