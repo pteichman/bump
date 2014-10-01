@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
-#include <MsTimer2.h>
+#include <FlexiTimer2.h>
 
 const int STEPS = 16;
 
@@ -22,10 +22,17 @@ void setup() {
     fill_beats((char *)&beat2, (int)random(STEPS), STEPS);
     fill_beats((char *)&beat3, (int)random(STEPS), STEPS);
 
-    // set up a timer running at 120bpm
-    MsTimer2::stop();
-    MsTimer2::set((int)(2500. / 120), &on_tick);
-    MsTimer2::start();
+    // Set up a timer running at ~120bpm. on_tick() is designed
+    // to also be used with a MIDI clock, where it gets 24 ticks
+    // per quarter note. So this timer needs to tick every
+    // 60000 / 24 / 120 = 20.833ms.
+    //
+    // With float truncation, what the below actually gives us is a
+    // tick every 20ms - 115bpm. We'll need to average out the error
+    // for more accuracy.
+    FlexiTimer2::stop();
+    FlexiTimer2::set((int)(60000. / 24. / 120.), &on_tick);
+    FlexiTimer2::start();
 
     MIDI.setHandleClock(&on_first_midi_tick);
 }
@@ -49,13 +56,12 @@ void on_first_midi_tick() {
 
     // disable the automatic timer and switch over to the MIDI clock
     MIDI.setHandleClock(&on_tick);
-    MsTimer2::stop();
+    FlexiTimer2::stop();
 }
 
-/* 24 pulses per quarter note: so for 8th notes wait 12 pulses */
 volatile unsigned char clock = 0;
 void on_tick() {
-    if (++clock > 12) {
+    if (clock++ > 4) {
         on_beat();
         clock = 0;
     }
@@ -66,9 +72,11 @@ void on_beat() {
     MIDI.sendNoteOn(36, 0, 1);
     MIDI.sendNoteOn(38, 0, 1);
     MIDI.sendNoteOn(51, 0, 1);
+    digitalWrite(LED_PIN, LOW);
 
     if (beat1[pos] == 'x') {
         MIDI.sendNoteOn(36, 100, 1);
+        digitalWrite(LED_PIN, HIGH);
     }
 
     if (beat2[pos] == 'x') {
